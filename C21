@@ -1,0 +1,11 @@
+SELECT  A.[Identified Customers],A.[Customer's Name],sum(sales) as sales
+FROM eppl.dbo.eppl_merge A
+--left join ExcludedCustomers ec on ec.[Identified Customers] = A.[Identified Customers]
+WHERE date >='2025-01-01'
+  AND [Customer Type] = 'Customer Sales'
+  AND [Parent Channel] = 'Retail'
+  AND A.[Identified Customers] != 'NA'
+  AND [Customer's Name] NOT LIKE '%default%'
+--  and ec.[Identified Customers] is null
+  group by A.[Identified Customers],A.[Customer's Name]
+    having sum(sales) > 0
