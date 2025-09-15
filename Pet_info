@@ -1,0 +1,19 @@
+select sid.bill_to_contact ,
+sid.shipping_address_name ,
+STRING_AGG(
+    DISTINCT 
+    rpp.name || '(' || COALESCE(pb.pet_type,'Unknown') || ')' || '(' ||
+    COALESCE(EXTRACT(YEAR FROM AGE(rpp.birthday))::text, 'Unknown') || ')'
+, ','),
+count(distinct rpp.name)as pet_count
+from sales_invoice_data sid 
+left join res_partner rp 
+on rp.phone =sid.bill_to_contact 
+left join res_partner_pet rpp 
+on rpp.partner_id =rp.id
+left join pet_breed pb 
+on rpp.breed=pb.id
+where customer_type ='Customer Sales'
+and sid.bill_to_contact in ()
+group by sid.bill_to_contact ,
+sid.shipping_address_name 
