@@ -1,1 +1,24 @@
 
+WITH ExcludedCustomers AS (
+select [Identified Customers],month(date) as months,
+count(distinct [Order Number]) as Orders,sum(sales) as sales
+from eppl.dbo.eppl_merge
+where Date>='2025-01-01'
+ AND [Customer Type] = 'Customer Sales'
+  AND [Parent Channel] = 'Retail'
+  AND [Identified Customers] != 'NA'
+  AND [Customer's Name] NOT LIKE '%default%'
+  and Category != 'Spa Services'
+  and [Identified Customers]='7042432838'
+  group by [Identified Customers],month(date)
+  having count(distinct [Order Number])>=2
+)
+select [Identified Customers],count(distinct months)as months,sum(sales) as sales
+from ExcludedCustomers
+group by [Identified Customers]
+having count(distinct months)>=10
+
+
+ 
+
+
