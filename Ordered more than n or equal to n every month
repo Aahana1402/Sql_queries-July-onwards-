@@ -9,7 +9,7 @@ where Date>='2025-01-01'
   AND [Identified Customers] != 'NA'
   AND [Customer's Name] NOT LIKE '%default%'
   and Category != 'Spa Services'
-  and [Identified Customers]='7042432838'
+ -- and [Identified Customers]='7042432838'
   group by [Identified Customers],month(date)
   having count(distinct [Order Number])>=2
 )
