@@ -1,0 +1,41 @@
+with cte as (
+select bill_to_contact, 
+shipping_address_name as Customer_Name
+from sales_invoice_data sid 
+where customer_type ='Customer Sales'
+and parent_channel='retail'
+and transaction_date >= '2025-10-01'
+and product_name like '%sara%wholesome%'
+and product_category ='Food'),
+
+cte2 as (select sid.state,sid.channel as Store_Name,sid.product_name,sid.product_category,sid.product_sub_category,sid.customer_id,sid.bill_to_contact,sid.invoice_number,sum(sid.quantity )as qty ,sid.final_amount
+from sales_invoice_data sid 
+left join cte on cte.bill_to_contact =sid.bill_to_contact
+where customer_type ='Customer Sales'
+and Length(Right((regexp_replace(sid.bill_to_contact, '[^\d]+', '', 'g')),10)) = 10
+and sid.shipping_address_name not ilike '%Default%'
+and sid.parent_channel='retail'
+and sid.transaction_date between '2025-04-01' and '2025-09-30'
+and sid.product_name ilike '%sara%wholesome%'
+and sid.product_category ='Food'
+and cte.bill_to_contact is null
+group by sid.state,sid.channel,sid.bill_to_contact ,sid.invoice_number ,sid.customer_id,sid.product_name,sid.product_category,sid.product_sub_category,sid.final_amount
+having sum(sid.quantity )>=2
+and sum(sid.p_amount)>=10),
+Pet AS (
+    SELECT
+        CPI.partner_id ,
+         String_AGG(distinct PB.Pet_type,',') as "Pet_Type",
+        String_AGG(distinct CPI.name,',') as "Pet_Name",
+        String_AGG(distinct pb.name,',') as "Breed"
+    FROM
+        res_partner_pet CPI
+        left join pet_breed pb on pb.id = cpi.breed
+  group by CPI.partner_id)
+  
+ select cte2.state,cte2.Store_Name,cte2.bill_to_contact,
+ cte2.product_name,cte2.product_category,
+ cte2.product_sub_category,
+ cte2.qty,cte2.final_amount, p."Pet_Type",p."Pet_Name",P."Breed" 
+ from CTE2
+ left join pet p on p.partner_id = CTE2.customer_id
