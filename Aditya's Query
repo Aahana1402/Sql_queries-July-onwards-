@@ -1,0 +1,109 @@
+with base as ( SELECT  * FROM eppl.dbo.eppl_merge
+    WHERE date >= '2025-07-01'
+      AND [Parent Channel] IN ('Retail', 'E-commerce')
+	  and Category='Treats'
+	   AND [Identified Customers] != 'NA'
+      AND [Customer's Name] NOT LIKE '%default%'
+)
+,thrice as (select [Identified Customers] 
+from eppl.dbo.eppl_merge
+ WHERE date >= '2025-07-01'
+ AND [Parent Channel] IN ('Retail', 'E-commerce')
+	  and Category='Treats'
+	   AND [Identified Customers] != 'NA'
+      AND [Customer's Name] NOT LIKE '%default%'
+group by [Identified Customers]
+having sum(sales)>0
+and count (distinct [Order Number])>=3)
+,selected as(
+select b.* from base b
+inner join thrice t on t.[Identified Customers]= b.[Identified Customers])
+-- LAST SKU PURCHASED 
+,last_sku as (select [Identified Customers],[Customer's Name],
+date AS last_purchase_date,
+[Main SKU],ROW_NUMBER() over (partition by [Identified Customers] order by date desc) as rn
+from selected s),
+cx_frequency AS (
+    SELECT
+        [Identified Customers],
+        COUNT(DISTINCT [Order Number]) AS cx_order_frequency_6m
+    FROM selected
+    GROUP BY [Identified Customers]
+),
+--MOST FREQUENT BOUGHT SKU
+sku_frequency AS (
+    SELECT
+        [Identified Customers],
+        [Main SKU],
+        COUNT(*) AS purchase_count,
+		SUM(Sales) AS sku_sales
+        FROM selected
+    GROUP BY  [Identified Customers],
+        [Main SKU]
+),
+--MOST FREQUENT BOUGHT SKU in desc
+ranked_sku AS (
+    SELECT *,
+           ROW_NUMBER() OVER (
+               PARTITION BY [Identified Customers]
+               ORDER BY purchase_count DESC,
+			   sku_sales DESC
+           ) AS rn
+    FROM sku_frequency
+),
+-- Total sales per customer
+total_sales AS (
+    SELECT
+        [Identified Customers],
+        SUM(Sales) AS total_sales_6m
+    FROM selected
+    GROUP BY [Identified Customers]
+),
+-- 4️ Channel usage type
+channel_usage AS (
+    SELECT
+        [Identified Customers],
+        CASE
+            WHEN COUNT(DISTINCT [Parent Channel]) = 1
+                 AND MAX([Parent Channel]) = 'Retail' THEN 'Retail Only'
+            WHEN COUNT(DISTINCT [Parent Channel]) = 1
+                 AND MAX([Parent Channel]) = 'Ecom' THEN 'Ecom Only'
+            ELSE 'Both'
+        END AS channel_type
+    FROM selected
+    GROUP BY [Identified Customers]
+),
+-- Most recent channel
+recent_channel AS (
+    SELECT
+        [Identified Customers],
+        [Parent Channel] AS recent_channel,
+        ROW_NUMBER() OVER (
+            PARTITION BY [Identified Customers]
+            ORDER BY date DESC
+        ) AS rn
+    FROM selected
+)
+SELECT
+    lp.[Identified Customers],
+	lp.[Customer's Name],
+	lp.last_purchase_date,
+	cf.cx_order_frequency_6m as CX_Frequency,
+    lp.[Main SKU],
+    rs.[Main SKU]             AS most_bought_sku_6m,
+    rs.purchase_count    AS most_bought_sku_count,
+    ts.total_sales_6m,
+    cu.channel_type,
+    rc.recent_channel
+FROM last_sku lp
+left join cx_frequency cf
+     on cf.[Identified Customers]=lp.[Identified Customers]
+LEFT JOIN ranked_sku rs
+       ON lp.[Identified Customers] = rs.[Identified Customers] AND rs.rn = 1
+LEFT JOIN total_sales ts
+       ON lp.[Identified Customers] = ts.[Identified Customers]
+LEFT JOIN channel_usage cu
+       ON lp.[Identified Customers] = cu.[Identified Customers]
+LEFT JOIN recent_channel rc
+       ON lp.[Identified Customers] = rc.[Identified Customers] AND rc.rn = 1
+WHERE lp.rn = 1;
